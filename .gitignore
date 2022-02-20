@@ -1,0 +1,6 @@
+/target
+.DS_Store
+/**/.DS_Store
+hashmap.txt
+/.vscode
+Cargo.lock
