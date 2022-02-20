@@ -282,8 +282,7 @@ fn maybe_memmap_file(file: &File) -> Result<Option<memmap::Mmap>> {
         if !metadata.is_file() // Not a real file.
             || file_size > isize::max_value() as u64 // Too long to safely map. https://github.com/danburkert/memmap-rs/issues/69
             || file_size == 0 // Mapping an empty file currently fails. https://github.com/danburkert/memmap-rs/issues/72
-            || file_size < 16 * 1024
-        // Mapping small files is not worth it.
+            || file_size < 16 * 1024 // Mapping small files is not worth it.
         {
             None
         } else {
@@ -308,7 +307,6 @@ fn write_hex_output(mut output: blake3::OutputReader, args: &Args) -> String {
         output.fill(&mut block);
         let hex_str = hex::encode(&block[..]);
         let take_bytes = cmp::min(len, block.len() as u64);
-        //print!("{}", &hex_str[..2 * take_bytes as usize]);
         out.push_str(&hex_str[..2 * take_bytes as usize]);
         len -= take_bytes;
     }
@@ -337,17 +335,6 @@ fn read_key_from_stdin() -> Result<[u8; blake3::KEY_LEN]> {
         n if n > 32 => bail!("read {n} bytes from stdin, expected 32"),
         _ => Ok(bytes[..blake3::KEY_LEN].try_into().unwrap()),
     }
-    /*if n < 32 {
-        bail!(
-            "expected {} key bytes from stdin, found {}",
-            blake3::KEY_LEN,
-            n,
-        )
-    } else if n > 32 {
-        bail!("read more than {} key bytes from stdin", blake3::KEY_LEN)
-    } else {
-        Ok(bytes[..blake3::KEY_LEN].try_into().unwrap())
-    }*/
 }
 
 struct FilepathString {
@@ -464,7 +451,6 @@ fn parse_check_line(mut line: &str) -> Result<ParsedCheckLine> {
     // two spaces. The hex characters in the hash must be lowercase for now,
     // though we could support uppercase too if we wanted to.
     let hash_hex_len = 2 * blake3::OUT_LEN;
-    //let num_spaces = 2; //obsolete (replaced with a 2 on line below)
     let prefix_len = hash_hex_len + 2;
     ensure!(line.len() > prefix_len, "Short line");
     ensure!(
@@ -583,8 +569,6 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
             return Ok(());
         }
         // check_one_line() prints errors and turns them into a success=false
-        // return, so it doesn't return a Result.
-        //let success = check_one_line(&line, args);
         if !check_one_line(&line, args) {
             *some_file_failed = true;
         }
@@ -647,14 +631,6 @@ fn main() -> Result<()> {
                 );
             }
         }
-
-        /*print!(
-            "{}",
-            list.iter()
-                .map(|(path, hash)| format!("{} {}", path, hash))
-                .collect::<Vec<_>>()
-                .join("\n")
-        );*/
         // write the hashmap to a file
         let mut file = File::create("hashmap.txt")?;
         for (path, hash) in list {
