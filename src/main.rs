@@ -337,13 +337,13 @@ fn read_key_from_stdin() -> Result<[u8; blake3::KEY_LEN]> {
     }
 }
 
-struct FilepathString {
+/*struct FilepathString {
     //filepath_string: String,
     is_escaped: bool,
-}
+}*/
 
 // returns (string, did_escape)
-fn filepath_to_string(filepath: &Path) -> FilepathString {
+fn filepath_to_string(filepath: &Path) -> bool {
     let unicode_cow = filepath.to_string_lossy();
     let mut filepath_string = unicode_cow.to_string();
     // If we're on Windows, normalize backslashes to forward slashes. This
@@ -360,10 +360,7 @@ fn filepath_to_string(filepath: &Path) -> FilepathString {
         //filepath_string = filepath_string.replace('\\', "\\\\").replace('\n', "\\n");
         is_escaped = true;
     }
-    FilepathString {
-        //filepath_string,
-        is_escaped,
-    }
+    is_escaped
 }
 
 fn hex_half_byte(c: char) -> Result<u8> {
@@ -496,11 +493,7 @@ fn hash_one_input(path: &Path, args: &Args) -> String {
         println!();
         return hash;
     }
-    let FilepathString {
-        //filepath_string: _,
-        is_escaped,
-    } = filepath_to_string(path);
-    if is_escaped {
+    if filepath_to_string(path) {
         print!("\\");
     }
     write_hex_output(output, args)
