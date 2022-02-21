@@ -357,7 +357,6 @@ fn filepath_to_string(filepath: &Path) -> bool {
     }
     let mut is_escaped = false;
     if filepath_string.contains('\\') || filepath_string.contains('\n') {
-        //filepath_string = filepath_string.replace('\\', "\\\\").replace('\n', "\\n");
         is_escaped = true;
     }
     is_escaped
@@ -553,7 +552,6 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
     let mut line = String::new();
     loop {
         line.clear();
-        //let n = bufreader.read_line(&mut line)?;
         if bufreader
             .read_line(&mut line)
             .expect("Could not read line from buffer")
