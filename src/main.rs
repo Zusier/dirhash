@@ -46,7 +46,8 @@ impl Args {
                         "Files to hash, or checkfiles to check. When no file is given,\n\
                  or when - is given, read standard input.",
                     ),
-            ).arg_required_else_help(true)
+            )
+            .arg_required_else_help(true)
             .arg(
                 Arg::new(OUTPUT_ARG)
                     .allow_invalid_utf8(true)
@@ -55,7 +56,8 @@ impl Args {
                     .takes_value(true)
                     .value_name("OUTPUT")
                     .help("Output file to write the hashmap to."),
-            ).arg_required_else_help(true)
+            )
+            .arg_required_else_help(true)
             .arg(
                 Arg::new(LENGTH_ARG)
                     .long(LENGTH_ARG)
