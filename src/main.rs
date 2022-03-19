@@ -12,6 +12,7 @@ use walkdir::WalkDir;
 const NAME: &str = "dirhash";
 
 const FILE_ARG: &str = "FILE";
+const OUTPUT_ARG: &str = "OUTPUT";
 const DERIVE_KEY_ARG: &str = "derive-key";
 const KEYED_ARG: &str = "keyed";
 const LENGTH_ARG: &str = "length";
@@ -25,6 +26,7 @@ const QUIET_ARG: &str = "quiet";
 struct Args {
     inner: clap::ArgMatches,
     file_args: Vec<PathBuf>,
+    output_path: PathBuf,
     base_hasher: blake3::Hasher,
 }
 
@@ -34,13 +36,26 @@ impl Args {
             .version(env!("CARGO_PKG_VERSION"))
             .arg(
                 Arg::new(FILE_ARG)
+                    .short('i')
+                    .long("input")
+                    .takes_value(true)
+                    .value_name("INPUT")
                     .multiple_occurrences(true)
                     .allow_invalid_utf8(true)
                     .help(
                         "Files to hash, or checkfiles to check. When no file is given,\n\
                  or when - is given, read standard input.",
                     ),
-            )
+            ).arg_required_else_help(true)
+            .arg(
+                Arg::new(OUTPUT_ARG)
+                    .allow_invalid_utf8(true)
+                    .short('o')
+                    .long("output")
+                    .takes_value(true)
+                    .value_name("OUTPUT")
+                    .help("Output file to write the hashmap to."),
+            ).arg_required_else_help(true)
             .arg(
                 Arg::new(LENGTH_ARG)
                     .long(LENGTH_ARG)
@@ -116,11 +131,8 @@ impl Args {
             // wild::args_os() is equivalent to std::env::args_os() on Unix,
             // but on Windows it adds support for globbing.
             .get_matches_from(wild::args_os());
-        let file_args = if let Some(iter) = inner.values_of_os(FILE_ARG) {
-            iter.map(|s| s.into()).collect()
-        } else {
-            vec!["-".into()]
-        };
+        let file_args = vec![PathBuf::from(inner.value_of(FILE_ARG).unwrap())];
+        let output_path = inner.value_of(OUTPUT_ARG).unwrap().into();
         if inner.is_present(RAW_ARG) && file_args.len() > 1 {
             bail!("Only one filename can be provided when using --raw");
         }
@@ -136,6 +148,7 @@ impl Args {
         Ok(Self {
             inner,
             file_args,
+            output_path,
             base_hasher,
         })
     }
@@ -623,7 +636,7 @@ fn main() -> Result<()> {
             }
         }
         // write the hashmap to a file
-        let mut file = File::create("hashmap.txt")?;
+        let mut file = File::create(&args.output_path)?;
         for (path, hash) in list {
             writeln!(file, "{}:{}", path, hash)?;
         }
