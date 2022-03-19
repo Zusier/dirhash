@@ -5,14 +5,16 @@ use std::collections::HashMap;
 use std::convert::TryInto;
 use std::fs::File;
 use std::io;
+use std::io::BufReader;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 const NAME: &str = "dirhash";
 
-const FILE_ARG: &str = "FILE";
-const OUTPUT_ARG: &str = "OUTPUT";
+const FILE_ARG: &str = "file";
+const OUTPUT_ARG: &str = "output";
+const VERIFY_ARG: &str = "verify";
 const DERIVE_KEY_ARG: &str = "derive-key";
 const KEYED_ARG: &str = "keyed";
 const LENGTH_ARG: &str = "length";
@@ -28,6 +30,7 @@ struct Args {
     file_args: Vec<PathBuf>,
     output_path: PathBuf,
     base_hasher: blake3::Hasher,
+    verify: bool
 }
 
 impl Args {
@@ -52,7 +55,7 @@ impl Args {
                 Arg::new(OUTPUT_ARG)
                     .allow_invalid_utf8(true)
                     .short('o')
-                    .long("output")
+                    .long(OUTPUT_ARG)
                     .takes_value(true)
                     .value_name("OUTPUT")
                     .help("Output file to write the hashmap to."),
@@ -130,11 +133,17 @@ impl Args {
                          Must be used with --check.",
                     ),
             )
+            .arg(
+                Arg::new(VERIFY_ARG)
+                    .help("Checks a hashmap against another hashmap. Outputs mismatches to 'modified.txt'.")
+                    .long(VERIFY_ARG)
+            )
             // wild::args_os() is equivalent to std::env::args_os() on Unix,
             // but on Windows it adds support for globbing.
             .get_matches_from(wild::args_os());
         let file_args = vec![PathBuf::from(inner.value_of(FILE_ARG).unwrap())];
         let output_path = inner.value_of(OUTPUT_ARG).unwrap().into();
+        let verify = inner.is_present(VERIFY_ARG);
         if inner.is_present(RAW_ARG) && file_args.len() > 1 {
             bail!("Only one filename can be provided when using --raw");
         }
@@ -152,6 +161,7 @@ impl Args {
             file_args,
             output_path,
             base_hasher,
+            verify,
         })
     }
 
@@ -583,6 +593,7 @@ fn check_one_checkfile(path: &Path, args: &Args, some_file_failed: &mut bool) ->
 
 fn main() -> Result<()> {
     let args = Args::parse()?;
+    if args.verify { hash_verify(); std::process::exit(0) }
     let mut thread_pool_builder = rayon::ThreadPoolBuilder::new();
     if let Some(num_threads) = args.num_threads()? {
         thread_pool_builder = thread_pool_builder.num_threads(num_threads);
@@ -592,7 +603,6 @@ fn main() -> Result<()> {
         let mut some_file_failed = false;
         // Note that file_args automatically includes `-` if nothing is given.
         let mut list: HashMap<String, String> = HashMap::new();
-
         if args.file_args[0].is_dir() {
             for entry in WalkDir::new(&args.file_args[0])
                 .into_iter()
@@ -644,4 +654,54 @@ fn main() -> Result<()> {
         }
         std::process::exit(if some_file_failed { 1 } else { 0 });
     })
+}
+
+fn hash_verify() {
+    let args = Args::parse().unwrap();
+    let input = args.file_args[0].to_string_lossy().into_owned();
+    let check = args.output_path.to_string_lossy().into_owned();
+    let mut list_input: HashMap<String, String> = HashMap::new();
+    let mut list_check: HashMap<String, String> = HashMap::new();
+
+    let mut file_input = File::open(&input).unwrap();
+    let reader_input = BufReader::new(&mut file_input).lines();
+    let mut file_check = File::open(&check).unwrap();
+    let reader_check = BufReader::new(&mut file_check).lines();
+
+    // parse the input file and insert back into hashmap
+    for line in reader_input {
+        let line = line.unwrap();
+        let mut split = line.split(":");
+        let path = split.next().unwrap();
+        let hash = split.next().unwrap();
+        list_input.insert(path.to_string(), hash.to_string());
+    }
+    // parse the check file and insert back into hashmap
+    for line in reader_check {
+        let line = line.unwrap();
+        let mut split = line.split(':');
+        let path = split.next().unwrap();
+        let hash = split.next().unwrap();
+        list_check.insert(path.to_string(), hash.to_string());
+    }
+
+    // match hashmaps
+    for entry in list_check.keys() {
+        // if entry for file doesn't exist in input, print error
+        if !list_input.contains_key(entry) {
+            println!("{}: NO EXIST", entry);
+            continue;
+        // if input hash doesn't match check hash, print error
+        } else if list_input[entry] != list_check[entry] {
+            println!("{}: MISMATCH", entry);
+            continue;
+        /*} else if !list_input.get(entry).unwrap().eq(list_check.get(entry).unwrap()) {
+            println!("{}: MISMATCH", entry);
+            continue;
+        */} else {
+            //println!("{}: OK", entry);
+            continue;
+        }
+    }
+    std::process::exit(0); // Add error handling later
 }
